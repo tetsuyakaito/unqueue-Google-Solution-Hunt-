@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Campus queues</title>
+<style>
+:root{--bg:#0f1115;--cd:#171a1f;--tx:#f1f1f1;--mu:#8a939f;--bd:#2c3038;--ac:#5dcaa5;--bl:#5dcaa5;--on:#0a1914;--gb:rgba(93,202,165,0.15);--gt:#5dcaa5;--ab:rgba(255,179,0,0.15);--at:#ffb300;--rb:rgba(239,83,80,0.15);--rt:#ef5350;--br:#23272e;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html{scroll-padding-top:env(safe-area-inset-top,0px);background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.app{max-width:420px;margin:0 auto;padding:16px 16px 100px}
+h1{font-size:28px;font-weight:600;margin:0;line-height:1.2}
+.mu{color:var(--mu);font-size:14px}
+.cd{background:transparent;border:1px solid var(--bd);border-radius:24px;padding:16px;margin-top:16px}
+.row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.big{font-size:36px;font-weight:600;line-height:1.1}
+.pill{font-size:12px;padding:4px 12px;border-radius:12px;white-space:nowrap;font-weight:500}
+.g{background:var(--gb);color:var(--gt)}.a{background:var(--ab);color:var(--at)}.r{background:var(--rb);color:var(--rt)}
+.tag{font-size:11px;padding:2px 8px;border-radius:8px;border:1px solid var(--bd);color:var(--mu)}
+.oc{height:4px;background:var(--br);border-radius:2px;margin-top:10px}
+.oc div{height:4px;border-radius:2px;background:var(--ac);transition:width .3s}
+.bars{display:flex;align-items:flex-end;gap:6px;height:80px;margin-top:12px}
+.bars div{flex:1;background:var(--br);border-radius:4px 4px 0 0;transition:background 0.3s}
+.lab{display:flex;gap:6px;font-size:11px;color:var(--mu)}.lab span{flex:1;text-align:center;margin-top:4px}
+.chips{display:flex;gap:10px;margin-top:16px;flex-wrap:wrap}
+.chips button{flex:1;font:inherit;font-size:14px;padding:10px;border-radius:12px;border:1px solid var(--bd);background:transparent;color:var(--tx);cursor:pointer;white-space:nowrap;transition:all 0.2s}
+.chips button.on{background:var(--gb);color:var(--gt);border-color:transparent;font-weight:500}
+.btn{display:block;width:100%;font:inherit;font-size:16px;font-weight:500;padding:16px;border-radius:24px;border:1px solid var(--bd);background:transparent;color:var(--tx);margin-top:16px;cursor:pointer;transition:all 0.2s}
+.pri{background:var(--ac);border-color:var(--ac);color:var(--on)}
+.sm{font:inherit;font-size:13px;padding:6px 12px;border-radius:10px;border:1px solid var(--bd);background:transparent;color:var(--tx);cursor:pointer}
+.qr{padding:12px 0;border-top:1px solid var(--bd)}
+.nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(420px,100%);display:flex;background:var(--bg);padding:8px 0 env(safe-area-inset-bottom,8px)}
+.nav button{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;font:inherit;font-size:12px;padding:8px 0;background:none;border:0;color:var(--mu);cursor:pointer;transition:color 0.2s}
+.nav button .ic{display:flex;align-items:center;justify-content:center;width:64px;height:32px;border-radius:16px;transition:all 0.2s}
+.nav button .ic::before{content:'';display:block;width:18px;height:18px;border-radius:9px;background:var(--mu);transition:all 0.2s}
+.nav button.on .ic{background:var(--gb)}
+.nav button.on .ic::before{background:var(--ac)}
+.nav button.on{color:var(--tx);font-weight:500}
+</style></head>
+<body><div class="app">
+<div class="row"><div><h1>Unqueue</h1><div class="mu" style="margin-top:4px">Know the wait before you go</div></div><div style="display:flex;gap:8px;align-items:center"><div id="sub"></div><button data-a="tab" data-v="staff" style="background:none;border:none;cursor:pointer;font-size:20px;color:var(--mu);padding:0">⚙️</button></div></div>
+<div id="v" style="margin-top:20px"></div>
+</div>
+<nav class="nav" id="nav"></nav>
+<script type="module">
+import {initializeApp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-app.js";
+import {getFirestore,collection,doc,onSnapshot,runTransaction,writeBatch,updateDoc,getDocs,serverTimestamp} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+/* ################ PASTE YOUR FIREBASE CONFIG HERE (replace every PASTE_HERE, keep the quotes) ################ */
+const firebaseConfig={
+apiKey:"AIzaSyBeklzjhkPj9ZsSJ--8PO73kcQ1rVXt_BU",
+authDomain:"unqueue-b7902.firebaseapp.com",
+projectId:"unqueue-b7902",
+storageBucket:"unqueue-b7902.firebasestorage.app",
+messagingSenderId:"752977202117",
+appId:"1:752977202117:web:e8af2b5d34795fcbb4d9ac"
+};
+/* ################ END OF FIREBASE CONFIG ################ */
+const READY=firebaseConfig.projectId!=='PASTE_HERE';
+const db=READY?getFirestore(initializeApp(firebaseConfig)):null;
+
+/* ===== 1. CONFIG: add or edit a place here, the UI adapts. modes: estimate (camera + YOLO) and/or token. Times are minutes from midnight (example timings). ===== */
+const PLACES=[
+{id:'mess',name:'Ganga mess',modes:['estimate'],windows:[[450,540],[720,840],[1140,1260]],cap:120,rate:7,curve:[[450,8],[495,20],[510,42],[525,70],[540,30],[720,20],[750,60],[780,90],[810,50],[840,15],[1140,15],[1170,45],[1200,70],[1230,35],[1260,10]]},
+{id:'market',name:'Supermarket',modes:['estimate'],windows:[[540,1260]],cap:60,rate:5,curve:[[540,15],[720,30],[900,25],[1080,50],[1140,55],[1260,20]]},
+{id:'cafe',name:'Cafeteria',modes:['estimate','token'],windows:[[480,1320]],cap:100,rate:6,pre:'F',svc:2,step:30,curve:[[480,10],[600,20],[750,60],[810,55],[930,25],[1080,35],[1200,45],[1320,15]],tip:'Book a token to collect your order without queuing.'},
+{id:'clinic',name:'Clinic',modes:['token'],windows:[[540,1020]],pre:'C',svc:3,step:15,note:"Emergency? Don't wait for a token. Go straight to the clinic desk."},
+{id:'bank',name:'Bank',modes:['token'],windows:[[600,960]],pre:'B',svc:4,step:15},
+{id:'parcel',name:'Parcels and pickup',modes:['estimate','token'],windows:[[600,1080]],cap:40,rate:3,pre:'P',svc:2,step:15,curve:[[600,6],[780,12],[930,10],[1020,22],[1080,10]],tip:'Book a pickup token for Gate 3.'},
+{id:'bus',name:'Transport',modes:['token'],windows:[[450,1140]],pre:'T',svc:2,step:15,tip:'Book a boarding slot for the golf cart or bus.'}
+];
+const NOWS=[[525,'8:45 am'],[750,'12:30 pm'],[1050,'5:30 pm']];
+
+/* ===== 2. HELPERS ===== */
+const $=i=>document.getElementById(i),P=id=>PLACES.find(p=>p.id==id),pad=n=>String(n).padStart(2,'0');
+const fmt=m=>{const h=Math.floor(m/60)%24,mm=m%60;return(h%12||12)+(mm?':'+pad(mm):'')+' '+(h>=12?'pm':'am')};
+const fs=m=>((Math.floor(m/60)%24)%12||12)+':'+pad(m%60);
+const lvl=(n,c)=>n<c*.25?['Low','g']:n<c*.5?['Moderate','a']:['Busy','r'];
+const label=t=>P(t.pid).pre+String(t.no).padStart(3,'0');
+const hours=p=>p.windows.map(w=>fmt(w[0])+' to '+fmt(w[1])).join(', ');
+const isOpen=(p,m)=>p.windows.some(w=>m>=w[0]&&m<w[1]);
+const SC={waiting:'a',called:'g',served:'g',cancelled:'r',skipped:'r',no_show:'r'};
+function crowdAt(p,m){const c=p.curve;if(m<=c[0][0])return c[0][1];for(let i=1;i<c.length;i++)if(m<=c[i][0]){const a=c[i-1],b=c[i];return a[1]+(b[1]-a[1])*(m-a[0])/(b[0]-a[0])}return c[c.length-1][1]}
+
+/* ===== 3. DATA LAYER: same api names and shapes as before. Reads are synchronous from a local cache (DB) that Firestore listeners keep updated. Writes go to Firestore. ===== */
+const DB={tokens:[],crowd:{},adj:{}};
+let fbStatus='connecting';
+const fail=e=>{console.error('Firestore error:',e);if(fbStatus!=='connected'){fbStatus='offline';render()}};
+const MY_ID=(()=>{try{let v=localStorage.getItem('unqueue_owner');if(!v){v='u'+Math.random().toString(36).slice(2,10)+Date.now().toString(36);localStorage.setItem('unqueue_owner',v)}return v}catch(e){return 'anon'+Math.random().toString(36).slice(2,10)}})();
+const tref=id=>doc(db,'tokens',id),cref=pid=>doc(db,'counters',pid);
+const isLive=id=>{const c=DB.crowd[id];return !!c&&typeof c.count=='number'&&Date.now()-c.updatedAt<=60000};
+const SEED=['Anil','Meera','Ravi','Sana'];
+function initLocalSeeds(){
+  if(DB.tokens.length)return;
+  PLACES.filter(p=>p.modes.includes('token')).forEach(p=>{
+    SEED.forEach((n,i)=>{
+      DB.tokens.push({id:p.id+'_'+(i+1),pid:p.id,no:i+1,name:n,slot:0,st:'waiting',createdAt:Date.now()-(4-i)*60000,ownerId:'seed',mine:false});
+    });
+  });
+}
+initLocalSeeds();
+async function newToken(pid,name,slot,ownerId){/* counter and token are written in one transaction, so two people never get the same number */
+let t;
+try{
+  await runTransaction(db,async tx=>{const s=await tx.get(cref(pid)),no=(s.exists()?s.data().seq:0)+1,id=pid+'_'+no;
+  tx.set(cref(pid),{seq:no});tx.set(tref(id),{id,pid,no,name,slot,st:'waiting',createdAt:serverTimestamp(),ownerId});
+  t={id,pid,no,name,slot,st:'waiting',createdAt:Date.now(),ownerId,mine:ownerId===MY_ID}});
+}catch(e){
+  fail(e);
+  const maxNo=Math.max(0,...DB.tokens.filter(x=>x.pid===pid).map(x=>x.no));
+  const no=maxNo+1,id=pid+'_'+no;
+  t={id,pid,no,name,slot,st:'waiting',createdAt:Date.now(),ownerId,mine:ownerId===MY_ID};
+}
+if(t&&!DB.tokens.some(x=>x.id===t.id)){DB.tokens.push(t);render()}
+return t}
+async function seedPlace(p){/* one-time seed: skipped if this place already has a counter */
+await runTransaction(db,async tx=>{const s=await tx.get(cref(p.id));if(s.exists()&&s.data().seq>0)return;
+SEED.forEach((n,i)=>{const id=p.id+'_'+(i+1);tx.set(tref(id),{id,pid:p.id,no:i+1,name:n,slot:0,st:'waiting',createdAt:serverTimestamp(),ownerId:'seed'})});
+tx.set(cref(p.id),{seq:SEED.length})})}
+async function resetDemo(){/* delete all tokens and counters, then seed again */
+if(db&&fbStatus==='connected'){
+  const snap=await getDocs(collection(db,'tokens')),tps=PLACES.filter(p=>p.modes.includes('token'));
+  const refs=snap.docs.map(d=>d.ref).concat(tps.map(p=>cref(p.id)));
+  for(let i=0;i<refs.length;i+=400){const b=writeBatch(db);refs.slice(i,i+400).forEach(r=>b.delete(r));await b.commit()}
+  for(const p of tps)await seedPlace(p)
+}else{
+  DB.tokens=[];initLocalSeeds();render();
+}}
+const api={
+getEstimate(id,now){/* GET /places/{id}/estimate. Uses the live camera count (Firestore crowd/{id}) if under 60 seconds old, else the simulated curve. */
+const p=P(id),adj=DB.adj[id]||0,w=p.windows.find(x=>now>=x[0]&&now<x[1]);
+if(!w){const nx=p.windows.find(x=>x[0]>now);return{open:false,opens:(nx||p.windows[0])[0],tomorrow:!nx}}
+const step=Math.ceil((w[1]-w[0])/6/15)*15,cnt=Math.ceil((w[1]-w[0])/step);
+const bars=[...Array(cnt)].map((_,i)=>{const t=w[0]+i*step;return{t,n:Math.max(0,Math.round(crowdAt(p,t))+adj)}});
+const ni=Math.min(cnt-1,Math.floor((now-w[0])/step));let bi=ni;for(let i=ni;i<cnt;i++)if(bars[i].n<bars[bi].n)bi=i;
+const live=isLive(id),n=live?Math.max(0,Math.round(DB.crowd[id].count)):Math.max(0,Math.round(crowdAt(p,now))+adj),wt=x=>Math.max(1,Math.round(x/p.rate));
+return{open:true,n,wait:wt(n),bars,ni,step,best:bars[bi],bestWait:wt(bars[bi].n),live}},
+sendReport(id,d){DB.adj[id]=(DB.adj[id]||0)+d},/* POST /reports */
+getSlots(id,now){/* GET /places/{id}/slots */
+const p=P(id),out=[];for(let t=Math.ceil(now/p.step)*p.step;out.length<4&&t<1440;t+=p.step)if(isOpen(p,t))out.push(t);return out},
+bookToken(id,slot){return newToken(id,'You',slot,MY_ID).catch(fail)},/* POST /tokens */
+myTokens(){return DB.tokens.filter(t=>t.mine).sort((a,b)=>b.createdAt-a.createdAt||b.no-a.no)},/* GET /tokens/me */
+queue(id){/* GET /places/{id}/queue */
+return DB.tokens.filter(t=>t.pid==id&&(t.st=='waiting'||t.st=='called')).sort((a,b)=>(b.st=='called')-(a.st=='called')||a.slot-b.slot||a.no-b.no)},
+queueInfo(id){const q=api.queue(id),c=q.find(t=>t.st=='called'),w=q.filter(t=>t.st=='waiting').length;return{waiting:w,serving:c?label(c):null,wait:w*P(id).svc}},
+callNext(id){/* POST /places/{id}/queue/call-next. One batch: called becomes served, earliest waiting becomes called. */
+const q=api.queue(id),c=q.find(t=>t.st=='called'),n=q.find(t=>t.st=='waiting');
+if(c)c.st='served';if(n)n.st='called';render();
+if(db&&(c||n)){const b=writeBatch(db);if(c)b.update(tref(c.id),{st:'served'});if(n)b.update(tref(n.id),{st:'called'});b.commit().catch(fail)}
+return n?{...n,st:'called'}:null},
+setStatus(tid,st){const t=DB.tokens.find(x=>x.id==tid);if(t){t.st=st;render()}if(db)updateDoc(tref(String(tid)),{st}).catch(fail)},/* POST /tokens/{id}/skip, /no-show, DELETE /tokens/{id} */
+walkIn(id){return newToken(id,'Walk-in',0,'walkin').catch(fail)}/* POST /tokens */
+};
+
+/* ===== 4. STORE ===== */
+const S={tab:'places',pid:null,now:750,f:'all',slot:null,sp:null,msg:''};
+
+/* ===== 5. UI: reads the store, calls api.* only ===== */
+const card=p=>{const o=isOpen(p,S.now),es=p.modes.includes('estimate'),tk=p.modes.includes('token');let s='',l=null,pct=0;
+if(!o){const nx=p.windows.find(w=>w[0]>S.now);s='Opens '+(nx?'at ':'tomorrow at ')+fmt((nx||p.windows[0])[0])}
+else{const parts=[];if(es){const e=api.getEstimate(p.id,S.now);l=lvl(e.n,p.cap);pct=Math.min(100,Math.round(e.n/p.cap*100));parts.push('~'+e.n+' people &middot; about '+e.wait+' min')}
+if(tk){const q=api.queueInfo(p.id);parts.push(q.waiting+' waiting &middot; token wait ~'+q.wait+' min')}s=parts.join('<br>')}
+return `<div class="cd" data-a="open" data-v="${p.id}" style="cursor:pointer;display:flex;flex-direction:column;gap:6px">
+<div class="row"><b style="font-size:16px">${p.name}</b><span class="pill ${o?(l?l[1]:(tk?'g':'a')):'a'}">${o?(l?l[0]:(tk?'Book':'Open')):'Closed'}</span></div>
+<div class="mu" style="font-size:13px">${s||hours(p)}</div>
+${o&&es?`<div class="oc" style="margin-top:8px;background:var(--br)"><div style="width:${pct}%;background:var(--${l?l[1]:'ac'}t)"></div></div>`:''}
+</div>`};
+const home=()=>`<div class="chips" style="gap:8px">${[['all','All'],['estimate','Live crowd'],['token','Tokens']].map(([k,l])=>`<button data-a="f" data-v="${k}" class="${k==S.f?'on':''}" style="flex:none">${k==S.f?'✓ ':''}${l}</button>`).join('')}</div>
+${PLACES.filter(p=>S.f=='all'||p.modes.includes(S.f)).map(card).join('')}
+<div style="margin-top:40px;opacity:0.5"><div class="mu">Demo time</div><div class="chips" style="margin-top:6px">${NOWS.map(([m,l])=>`<button data-a="time" data-v="${m}" class="${m==S.now?'on':''}">${l}</button>`).join('')}</div></div>`;
+function est(p){const e=api.getEstimate(p.id,S.now);
+if(!e.open)return `<div style="margin-top:32px"><b>Live crowd</b><div class="mu">Closed. Opens ${e.tomorrow?'tomorrow at ':'at '}${fmt(e.opens)}.</div></div>`;
+const l=lvl(e.n,p.cap),lim=p.cap*.25,calm=e.bars.filter(b=>b.n<lim),mx=Math.max(...e.bars.map(b=>b.n),1),bi=e.bars.indexOf(e.best);
+const pct=Math.min(100,Math.round(e.n/p.cap*100));
+const bt=calm.length?fmt(calm[0].t):fmt(e.best.t);
+const adv=e.n<lim?"You're in the calm window.":bi>e.ni?`About ${e.best.n} people, ${e.bestWait} min wait. Save ${Math.max(0,e.wait-e.bestWait)} min.`:"It only gets busier.";
+return `<div style="margin-top:32px;display:flex;flex-direction:column;gap:12px">
+<div class="row"><span class="mu">Crowd now</span>${e.live?'<span style="color:var(--gt);font-size:13px;font-weight:500">🟢 Live from camera</span>':''}</div>
+<div class="row" style="align-items:flex-end;margin-bottom:8px">
+  <div class="big">~${e.n} people</div>
+  <span class="pill ${l[1]}">${l[0]}</span>
+</div>
+<div class="oc" style="margin-top:0;background:var(--br);height:6px"><div style="width:${pct}%;background:var(--${l[1]}t);height:6px;border-radius:3px"></div></div>
+<div class="row mu"><span>Seats: ${p.cap}</span><span>About ${e.wait} min wait</span></div>
+<div class="mu" style="margin-top:4px;opacity:0.6">3 classes ended at 12:50</div>
+</div>
+<div style="margin-top:32px">
+  <div class="bars" style="height:100px">${e.bars.map((b,i)=>`<div style="height:${10+Math.round(b.n/mx*90)}px;border-radius:6px 6px 0 0;${b.n<lim?'background:var(--gt);':(b.n>lim*2?'background:var(--br);':'background:var(--br);')}${i==e.ni?'background:#4285F4;':''}"></div>`).join('')}</div>
+  <div class="lab" style="margin-top:8px">${e.bars.map((b,i)=>`<span>${i==e.ni?'now':fs(b.t)}</span>`).join('')}</div>
+</div>
+<div class="cd" style="background:#0a2918;border-color:transparent;color:var(--gt);margin-top:32px;display:flex;flex-direction:column;gap:4px">
+  <div style="font-size:13px;opacity:0.9">Best time to go</div>
+  <div class="big" style="font-size:28px">${bt}</div>
+  <div style="font-size:13px;font-weight:500;opacity:0.9">${adv}</div>
+</div>
+<div class="cd row" style="background:transparent;padding:16px;border-color:var(--bd)"><span class="mu" style="font-size:13px">Mess 3 is quieter, 3 min walk</span><b style="color:var(--gt);cursor:pointer">View</b></div>
+<div style="margin-top:40px;text-align:center;display:flex;flex-direction:column;align-items:center">
+  <div class="mu" style="margin-bottom:12px">Does this match what you see?</div>
+  <div class="chips" style="margin-top:0;justify-content:center;gap:12px">${[['Emptier',-6],['Right',0],['Busier',6]].map(([n,d])=>`<button data-a="rep" data-v="${d}" style="flex:none;min-width:90px;border-radius:24px">${n}</button>`).join('')}</div>
+  <div class="mu" style="margin-top:16px">${S.msg}</div>
+</div>`}
+function tok(p){const sl=api.getSlots(p.id,S.now),q=api.queueInfo(p.id);if(!sl.includes(S.slot))S.slot=sl[0];
+return `<div class="cd"><div class="row"><b>Book a token</b><span class="mu">${q.waiting} waiting</span></div><div class="mu">Now serving ${q.serving||'none yet'}. New token wait about ${q.wait} min.</div>
+${sl.length?`<div class="mu" style="margin-top:10px">Pick a time</div><div class="chips" style="margin-top:6px">${sl.map(t=>`<button data-a="slot" data-v="${t}" class="${t==S.slot?'on':''}">${fmt(t)}</button>`).join('')}</div><button class="btn pri" data-a="book">Book token</button>`:'<div class="mu" style="margin-top:8px">No slots left today.</div>'}
+${p.note?`<div class="mu" style="margin-top:8px">${p.note}</div>`:''}</div>`}
+const detail=p=>{const o=isOpen(p,S.now);return `<div class="row" style="margin-top:12px"><button data-a="back" style="background:none;border:none;color:var(--tx);font-size:16px;cursor:pointer;padding:0">&larr; Back</button><b style="font-size:20px">${p.name}</b></div>${p.tip?`<div class="mu" style="margin-top:12px">${p.tip}</div>`:''}${p.modes.includes('estimate')?est(p):''}${p.modes.includes('token')?tok(p):''}`};
+const mine=()=>{const ts=api.myTokens();if(!ts.length)return `<div class="cd"><b>No tokens yet</b><div class="mu">Book one from a place with a token.</div></div>`;
+return ts.map(t=>{const p=P(t.pid),q=api.queue(t.pid).filter(x=>x.st=='waiting'),a=Math.max(0,q.indexOf(t)),c=t.st=='called';
+const d=(i)=>`var(--${i<=(c?2:1)?'gt':'br'})`;
+return `
+<div style="margin-top:12px">
+  <h1 style="font-size:32px">My tokens</h1>
+  <div class="mu" style="margin-top:4px">${p.name}</div>
+</div>
+<div class="cd" style="margin-top:24px;text-align:center;padding:32px 16px">
+  <div class="mu" style="font-size:12px;letter-spacing:1px;text-transform:uppercase">YOUR TOKEN</div>
+  <div style="font-size:72px;font-weight:700;line-height:1;color:var(--gt);margin-top:16px">${label(t)}</div>
+  <div class="mu" style="margin-top:12px">Slot ${fmt(t.slot)}</div>
+  <div style="border-top:1px dashed var(--bd);margin:32px 0 24px"></div>
+  <div class="row" style="text-align:center;align-items:flex-start">
+    <div style="flex:1"><div style="font-size:32px;font-weight:600">${a}</div><div class="mu" style="font-size:12px;margin-top:4px">people ahead</div></div>
+    <div style="flex:1"><div style="font-size:32px;font-weight:600">~${a*p.svc} min</div><div class="mu" style="font-size:12px;margin-top:4px">estimated wait</div></div>
+  </div>
+  <div style="display:flex;align-items:center;margin-top:40px;padding:0 8px">
+    <div style="width:14px;height:14px;background:${d(0)};border-radius:7px"></div>
+    <div style="flex:1;height:4px;background:${d(1)};margin:0 -2px"></div>
+    <div style="width:14px;height:14px;background:${d(1)};border-radius:7px"></div>
+    <div style="flex:1;height:4px;background:${d(2)};margin:0 -2px"></div>
+    <div style="width:14px;height:14px;background:${d(2)};border-radius:7px"></div>
+    <div style="flex:1;height:4px;background:${d(3)};margin:0 -2px"></div>
+    <div style="width:14px;height:14px;background:${d(3)};border-radius:7px"></div>
+  </div>
+  <div class="row mu" style="margin-top:8px;font-size:11px"><span>Booked</span><span>Waiting</span><span>Called</span><span>Served</span></div>
+</div>
+${c?`<div class="cd" style="background:#0a2918;border-color:transparent;margin-top:24px;padding:24px"><div style="font-size:24px;font-weight:600;color:var(--gt)">Your turn!</div><div style="color:var(--gt);margin-top:8px">Go to Counter 2 now</div><div style="color:var(--gt);margin-top:8px;opacity:0.8;font-size:13px">We hold your spot for 3 min</div></div>`:''}
+${t.st=='waiting'||c?`<button class="btn" data-a="cancel" data-v="${t.id}" style="margin-top:32px;border-color:var(--rt);color:var(--rt)">Cancel token</button>`:''}
+`}).join('')};
+const staff=()=>{const tps=PLACES.filter(p=>p.modes.includes('token'));if(!S.sp)S.sp=tps[0].id;const q=api.queue(S.sp),cur=q.find(t=>t.st=='called'),w=q.filter(t=>t.st=='waiting');
+return `
+<div class="row" style="margin-top:12px;align-items:center">
+  <h1 style="font-size:28px">Staff console</h1>
+  <span class="pill a" style="font-size:12px">Staff only</span>
+</div>
+<div class="chips" style="margin-top:24px;gap:8px">${tps.map(x=>`<button data-a="sp" data-v="${x.id}" class="${x.id==S.sp?'on':''}" style="flex:none">${x.id==S.sp?'✓ ':''}${x.name}</button>`).join('')}</div>
+<div class="cd" style="margin-top:24px;text-align:center;padding:32px 16px">
+  <div class="mu" style="font-size:11px;letter-spacing:1px;text-transform:uppercase">NOW SERVING</div>
+  <div style="font-size:72px;font-weight:700;line-height:1;color:var(--gt);margin-top:16px">${cur?label(cur):'None'}</div>
+  <div class="mu" style="margin-top:12px">${cur?cur.name+' &middot; Counter 2':'Tap Call next'}</div>
+</div>
+<button class="btn pri" data-a="call" style="margin-top:24px;color:var(--bg);font-weight:600">Call next</button>
+<div style="margin-top:32px">
+  <div class="row" style="margin-bottom:12px"><b>Queue</b><span class="mu">${w.length} waiting</span></div>
+  <div style="border-top:1px solid var(--bd)"></div>
+  ${q.length?q.map(t=>`
+    <div class="row" style="padding:16px 0;border-bottom:1px solid var(--bd)">
+      <div style="display:flex;align-items:center;gap:16px">
+        <b style="font-size:16px;width:50px">${label(t)}</b>
+        <span class="mu">${t.name}${t.slot?' &middot; '+fmt(t.slot):''}</span>
+      </div>
+      <div class="row">
+        ${t.st=='waiting'?`<button class="sm" data-a="skip" data-v="${t.id}" style="border-radius:16px;padding:6px 16px">Skip</button>`:`<span class="pill ${SC[t.st]}">${t.st}</span>`}
+      </div>
+    </div>
+  `).join(''):'<div class="mu" style="padding:16px 0;border-bottom:1px solid var(--bd)">Queue is empty.</div>'}
+</div>
+<div class="row" style="margin-top:32px;gap:12px">
+  <button class="btn" style="margin-top:0;font-size:14px">Pause queue</button>
+  <button class="btn" data-a="walk" style="margin-top:0;font-size:14px">Walk-in token</button>
+</div>
+<div class="mu" style="text-align:center;margin-top:40px;font-size:13px">Opened via a separate staff link</div>
+<div style="text-align:center;margin-top:40px"><button class="sm" data-a="reset" style="opacity:.35;font-size:11px;border:none">Reset demo</button></div>
+`};
+function render(){
+$('sub').innerHTML=`<span class="pill g" style="background:var(--gb);color:var(--gt);font-weight:600">${fmt(S.now)}</span>`+(fbStatus==='connected'?' <span class="tag" style="background:var(--gb);color:var(--gt);border-color:transparent">● Live sync</span>':fbStatus==='offline'?' <span class="tag" style="background:var(--ab);color:var(--at);border-color:transparent">Demo</span>':'');
+const called=api.myTokens().filter(t=>t.st=='called').length;
+$('nav').innerHTML=[['places','Places'],['mine','My tokens'+(called?' •':'')]].map(([k,n])=>`<button data-a="tab" data-v="${k}" class="${S.tab==k?'on':''}"><div class="ic"></div>${n}</button>`).join('');
+$('v').innerHTML=S.tab=='places'?(S.pid?detail(P(S.pid)):home()):S.tab=='mine'?mine():staff();
+}
+document.addEventListener('click',e=>{const b=e.target.closest('[data-a]');if(!b)return;const a=b.dataset.a,v=b.dataset.v;
+if(a=='tab'){S.tab=v;if(v=='places')S.pid=null}
+else if(a=='time')S.now=+v;
+else if(a=='f')S.f=v;
+else if(a=='open'){S.pid=v;S.slot=null;S.msg=''}
+else if(a=='back')S.pid=null;
+else if(a=='slot')S.slot=+v;
+else if(a=='book'){api.bookToken(S.pid,S.slot);S.tab='mine'}
+else if(a=='cancel')api.setStatus(v,'cancelled');
+else if(a=='rep'){api.sendReport(S.pid,+v);S.msg='Thanks, estimate updated.'}
+else if(a=='sp')S.sp=v;
+else if(a=='call')api.callNext(S.sp);
+else if(a=='skip')api.setStatus(v,'skipped');
+else if(a=='noshow')api.setStatus(v,'no_show');
+else if(a=='walk')api.walkIn(S.sp);
+else if(a=='reset'){if(confirm('Delete all tokens and reset the demo?'))resetDemo().catch(fail)}
+render()});
+render();
+
+/* ===== 6. LIVE LISTENERS: keep the cache fresh and redraw when Firestore changes ===== */
+if(!READY){alert('Unqueue: paste your Firebase config into the FIREBASE CONFIG block at the top of the script, then reload.')}
+else{
+let seeded=false,shown='';
+const parseTime=t=>!t?0:typeof t==='number'?t:t.toMillis?t.toMillis():t.toDate?t.toDate().getTime():typeof t==='string'?new Date(t).getTime():0;
+const sig=()=>Object.keys(DB.crowd).sort().map(k=>k+':'+DB.crowd[k].count+':'+isLive(k)).join('|');
+const crowdChanged=()=>{const s=sig();if(s!==shown){shown=s;render()}};
+onSnapshot(collection(db,'tokens'),snap=>{
+fbStatus='connected';
+DB.tokens=snap.docs.map(d=>{const x=d.data({serverTimestamps:'estimate'});return{id:d.id,pid:x.pid,no:x.no,name:x.name,slot:x.slot,st:x.st,createdAt:parseTime(x.createdAt),ownerId:x.ownerId,mine:x.ownerId===MY_ID}}).filter(t=>P(t.pid));
+if(!seeded&&!snap.metadata.fromCache){seeded=true;PLACES.filter(p=>p.modes.includes('token')&&!DB.tokens.some(t=>t.pid==p.id)).forEach(p=>seedPlace(p).catch(fail))}
+render()},err=>{fail(err)});
+onSnapshot(collection(db,'crowd'),snap=>{
+fbStatus='connected';
+DB.crowd={};snap.forEach(d=>{const x=d.data();DB.crowd[d.id]={count:x.count,source:x.source,updatedAt:parseTime(x.updatedAt)}});
+crowdChanged()},err=>{fail(err)});
+setInterval(crowdChanged,5000)/* re-check every 5 s so live data expires after 60 s */
+}
+</script></body></html>
